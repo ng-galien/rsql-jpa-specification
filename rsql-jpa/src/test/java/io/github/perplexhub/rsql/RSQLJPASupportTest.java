@@ -929,6 +929,25 @@ class RSQLJPASupportTest {
 	}
 
 	@Test
+	void testSortWithEnclosingFunction() {
+
+		List<Company> companies = companyRepository.findAll(toSort("upper(code),asc"));
+		Assertions.assertThat(companies)
+				.extracting(Company::getCode)
+				.containsExactly("demo", "empty", "fake", "hello", "null", "Test", "World");
+
+		companies = companyRepository.findAll(toSort("upper(code),desc"));
+		Assertions.assertThat(companies)
+				.extracting(Company::getCode)
+				.containsExactly("World", "Test", "null", "hello", "fake", "empty", "demo");
+
+		companies = companyRepository.findAll(toSort("char_length(code),asc;upper(code),asc"));
+		Assertions.assertThat(companies)
+				.extracting(Company::getCode)
+				.containsExactly("demo", "fake", "null", "Test", "empty", "hello", "World");
+	}
+
+	@Test
 	@Transactional // required to get values from lazy collections
 	void testSortByPropertyWithOneToManyRelation() {
 		List<Company> companies = companyRepository.findAll(toSort("users.userRoles.role.code,asc;id,asc"));

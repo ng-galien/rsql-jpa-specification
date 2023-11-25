@@ -3,6 +3,7 @@ package io.github.perplexhub.rsql;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -49,21 +50,25 @@ class SortUtils {
 
     @SuppressWarnings("unchecked")
     private static Order sortToJpaOrder(final String[] parts, final SortSupport sortSupport, final Root<?> root, final CriteriaBuilder cb) {
-        final String property = parts[0];
-        final String direction = parts.length > 1 ? parts[1] : "asc";
-
+//        final String property = parts[0];
+//        final String direction = parts.length > 1 ? parts[1] : "asc";
+        final SortItem sortItem = from(parts);
         final RSQLJPAPredicateConverter rsqljpaPredicateConverter =
                 new RSQLJPAPredicateConverter(cb, sortSupport.getPropertyPathMapper(), null, sortSupport.getJoinHints());
-        final RSQLJPAContext rsqljpaContext = rsqljpaPredicateConverter.findPropertyPath(property, root);
+        final RSQLJPAContext rsqljpaContext = rsqljpaPredicateConverter.findPropertyPath(sortItem.property, root);
 
         final boolean isJson = rsqljpaPredicateConverter.isJsonType(rsqljpaContext.getAttribute());
-        Expression<?> propertyExpression = isJson? jsonPathOf(rsqljpaContext.getPath(), property, cb) : rsqljpaContext.getPath();
+        Expression<?> propertyExpression = isJson? jsonPathOf(rsqljpaContext.getPath(), sortItem.property, cb) : rsqljpaContext.getPath();
 
-        if (parts.length > 2 && "ic".equalsIgnoreCase(parts[2]) && String.class.isAssignableFrom(propertyExpression.getJavaType())) {
+        if (sortItem.asEnclosingFunction()) {
+            propertyExpression = cb.function(sortItem.enclosingFunction, propertyExpression.getJavaType(), propertyExpression);
+        }
+
+        if (sortItem.isIgnoreCase() && String.class.isAssignableFrom(propertyExpression.getJavaType())) {
             propertyExpression = cb.lower((Expression<String>) propertyExpression);
         }
 
-        return direction.equalsIgnoreCase("asc") ? cb.asc(propertyExpression) : cb.desc(propertyExpression);
+        return sortItem.isAscending() ? cb.asc(propertyExpression) : cb.desc(propertyExpression);
     }
 
     private static Expression<?> jsonPathOf(Path<?> path, String property, CriteriaBuilder builder) {
@@ -74,6 +79,47 @@ class SortUtils {
                     .map(builder::literal)
                     .forEach(args::add);
             return builder.function("jsonb_extract_path", String.class, args.toArray(Expression[]::new));
+    }
+
+    private record SortItem(String property, String direction, String ignoreCase, String enclosingFunction) {
+        boolean isAscending() {
+            return "asc".equalsIgnoreCase(direction);
+        }
+
+        boolean isIgnoreCase() {
+            return "ic".equalsIgnoreCase(ignoreCase);
+        }
+
+        boolean asEnclosingFunction() {
+            return enclosingFunction != null;
+        }
+    }
+
+    private static SortItem from(String[] parts) {
+        if(parts.length == 0) {
+            throw new IllegalArgumentException("Invalid sort syntax");
+        }
+        String property = parts[0];
+        if(property.isEmpty()) {
+            throw new IllegalArgumentException("Invalid sort syntax");
+        }
+        String enclosingFunction = null;
+        //Check if the property is a function call
+        if(property.contains("(") && property.endsWith(")")) {
+            enclosingFunction = property.substring(0, property.indexOf("("));
+            property = property.substring(property.indexOf("(") + 1, property.length() - 1);
+        }
+
+        String direction = "asc";
+        String ignoreCase = null;
+        if(parts.length > 1) {
+            direction = parts[1];
+        }
+
+        if(parts.length > 2) {
+            ignoreCase = parts[2];
+        }
+        return new SortItem(property, direction, ignoreCase, enclosingFunction);
     }
 
 }

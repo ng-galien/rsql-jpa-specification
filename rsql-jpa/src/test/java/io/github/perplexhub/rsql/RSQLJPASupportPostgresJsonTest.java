@@ -131,6 +131,7 @@ class RSQLJPASupportPostgresJsonTest {
         return Stream.of(
                 sortByNumber(),
                 sortByNested(),
+                sortByFunction(),
                 null
         ).filter(Objects::nonNull).flatMap(s -> s);
     }
@@ -474,6 +475,18 @@ class RSQLJPASupportPostgresJsonTest {
         return Stream.of(
                 arguments(allCases, "properties.a.b.c,asc", List.of(e1, e2, e3)),
                 arguments(allCases, "properties.a.b.c,desc", List.of(e3, e2, e1)),
+                null
+        ).filter(Objects::nonNull);
+    }
+
+    private static Stream<Arguments> sortByFunction() {
+        var e1 = new PostgresJsonEntity(Map.of("0", "2", "a", Map.of("b", Map.of("c", 1))));
+        var e2 = new PostgresJsonEntity(Map.of("1", "1", "a", Map.of("b", Map.of("c", 2))));
+        var e3 = new PostgresJsonEntity(Map.of("2", "0", "a", Map.of("b", Map.of("c", 3))));
+        var allCases = List.of(e1, e2, e3);
+        return Stream.of(
+                arguments(allCases, "jsonb_pretty(properties.a.b.c),asc", List.of(e1, e2, e3)),
+                arguments(allCases, "jsonb_pretty(properties.a.b.c),desc", List.of(e3, e2, e1)),
                 null
         ).filter(Objects::nonNull);
     }
