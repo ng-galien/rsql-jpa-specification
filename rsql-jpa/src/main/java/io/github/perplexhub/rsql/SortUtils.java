@@ -12,7 +12,6 @@ import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Order;
 import jakarta.persistence.criteria.Root;
 
-import org.hibernate.query.criteria.JpaExpression;
 import org.springframework.lang.Nullable;
 import org.springframework.util.StringUtils;
 
@@ -73,7 +72,7 @@ class SortUtils {
         });
 
         if (ic && String.class.isAssignableFrom(propertyExpression.getJavaType())) {
-            propertyExpression = cb.lower(propertyExpression.as(String.class));
+            propertyExpression = cb.lower(HibernateSupport.cast(propertyExpression, String.class));
         }
 
         return direction.equalsIgnoreCase("asc") ? cb.asc(propertyExpression) : cb.desc(propertyExpression);
@@ -104,12 +103,12 @@ class SortUtils {
                     .map(builder::literal)
                     .forEach(args::add);
             Expression<?> expression = builder.function("jsonb_extract_path", Object.class, args.toArray(Expression[]::new));
-            if (ic && expression instanceof JpaExpression<?> jpaExpression) {
-                expression = jpaExpression.cast(String.class);
+            if (ic) {
+                expression = HibernateSupport.cast(expression, String.class);
             }
             return expression;
         } else {
-            return context.getPath().as(String.class);
+            return HibernateSupport.cast(context.getPath(), String.class);
         }
     }
 

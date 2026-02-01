@@ -21,7 +21,6 @@ import cz.jirutka.rsql.parser.ast.ComparisonOperator;
 import cz.jirutka.rsql.parser.ast.OrNode;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.hibernate.query.criteria.JpaExpression;
 
 @Slf4j
 @SuppressWarnings({ "rawtypes", "unchecked" })
@@ -259,13 +258,7 @@ public class RSQLJPAPredicateConverter extends RSQLVisitorBase<Predicate, From> 
 					ComparisonNode jsonbNode = node.withSelector(jsonbPath);
 					return JsonbSupport.jsonbPathExistsExpression(builder, jsonbNode, path, jsonbConfiguration);
 				} else {
-					final Expression expression;
-					if (path instanceof JpaExpression jpaExpression) {
-						expression = jpaExpression.cast(String.class);
-					} else {
-						expression = path.as(String.class);
-					}
-					return ResolvedExpression.ofPath(expression, String.class);
+					return ResolvedExpression.ofPath(HibernateSupport.cast(path, String.class), String.class);
 				}
 			} else {
 				if (attribute != null
@@ -409,7 +402,7 @@ public class RSQLJPAPredicateConverter extends RSQLVisitorBase<Predicate, From> 
 
 	private Predicate likePredicate(Expression<?> expression, Object argument, boolean ignoreCase) {
 		String argToUse = String.valueOf(argument);
-		Expression<String> strExpression = expression.as(String.class);
+		Expression<String> strExpression = HibernateSupport.cast(expression, String.class);
 		if (ignoreCase) {
 			if (HibernateSupport.isHibernateCriteriaBuilder(builder)) {
 				return HibernateSupport.ilike(builder, strExpression, argToUse, likeEscapeCharacter);
@@ -417,7 +410,7 @@ public class RSQLJPAPredicateConverter extends RSQLVisitorBase<Predicate, From> 
 
 			return likePredicate(builder.upper(strExpression), "%" + argToUse.toUpperCase(Locale.ROOT) + "%", builder);
 		}
-		
+
 		return likePredicate(strExpression, "%" + argToUse + "%", builder);
 	}
 
